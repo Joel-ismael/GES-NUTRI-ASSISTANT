@@ -9,6 +9,30 @@ from datetime import datetime
 st.set_page_config(page_title="Nutri-Soutien Pro", page_icon="🥗", layout="wide")
 st.markdown("""<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
+# --- AJOUT DE L'IMAGE D'ARRIÈRE-PLAN ---
+def add_bg_from_url():
+    st.markdown(
+         f"""
+         <style>
+         .stApp {{
+             background-image: url("https://raw.githubusercontent.com/joel-ismael/nutrisoutien1/main/t%C3%A9l%C3%A9charger.jpg");
+             background-attachment: fixed;
+             background-size: cover;
+         }}
+         
+         /* Bloc pour rendre les formulaires et tableaux lisibles sur l'image */
+         .stTabs, .stForm, [data-testid="stMetric"], .stDataFrame, .stTable {{
+             background-color: rgba(255, 255, 255, 0.85) !important;
+             padding: 20px;
+             border-radius: 10px;
+         }}
+         </style>
+         """,
+         unsafe_allow_html=True
+     )
+
+add_bg_from_url()
+
 # --- BASE DE DONNÉES ---
 def init_db():
     conn = sqlite3.connect('nutri_data_v2.db', check_same_thread=False)
@@ -71,7 +95,6 @@ def main():
         u_email = st.session_state.user_info[0]
         st.sidebar.title(f"👤 {st.session_state.user_info[2]}")
         
-        # AJOUT DE L'OPTION "MON COMPTE" DANS LE MENU
         menu = st.sidebar.selectbox("Navigation", ["Collecte & Gestion", "Mon Compte", "Déconnexion"])
 
         if menu == "Déconnexion":
@@ -95,7 +118,6 @@ def main():
                         c.execute('UPDATE users SET nom=?, prenom=? WHERE email=?', (new_nom, new_prenom, u_email))
                     
                     conn.commit()
-                    # Mise à jour de la session
                     st.session_state.user_info[1] = new_nom
                     st.session_state.user_info[2] = new_prenom
                     st.success("Informations mises à jour !")
@@ -105,7 +127,6 @@ def main():
             st.header("📋 Gestion des données patients")
             tab_saisie, tab_histo, tab_modif = st.tabs(["📥 Saisie", "📊 Archives & Graphique", "🛠️ Modifier/Supprimer"])
             
-            # --- SAISIE ---
             with tab_saisie:
                 with st.form("form_saisie"):
                     p_nom = st.text_input("Nom du Patient")
@@ -119,7 +140,6 @@ def main():
                         conn.commit()
                         st.success(f"Enregistré : {p_nom} est en '{statut}' (IMC: {imc})")
 
-            # --- ARCHIVES & GRAPHIQUE ---
             with tab_histo:
                 c.execute('SELECT date, patient, imc, statut FROM collectes WHERE user_email=?', (u_email,))
                 rows = c.fetchall()
@@ -138,7 +158,6 @@ def main():
                         st.plotly_chart(fig, use_container_width=True)
                 else: st.info("Aucune donnée.")
 
-            # --- MODIFIER / SUPPRIMER ---
             with tab_modif:
                 c.execute('SELECT id, patient, poids, taille FROM collectes WHERE user_email=?', (u_email,))
                 items = c.fetchall()
