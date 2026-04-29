@@ -63,18 +63,43 @@ def main():
                     c.execute('SELECT * FROM users WHERE nom=? AND prenom=? AND password=?', (l_n, l_p, hash_pwd(l_pw)))
                     user = c.fetchone()
                     if user:
-                        st.session_state.authenticated, st.session_state.user_info = True, user
+                        st.session_state.authenticated, st.session_state.user_info = True, list(user)
                         st.rerun()
                     else: st.error("Identifiants incorrects.")
 
     else:
         u_email = st.session_state.user_info[0]
         st.sidebar.title(f"👤 {st.session_state.user_info[2]}")
-        menu = st.sidebar.selectbox("Navigation", ["Collecte & Gestion", "Déconnexion"])
+        
+        # AJOUT DE L'OPTION "MON COMPTE" DANS LE MENU
+        menu = st.sidebar.selectbox("Navigation", ["Collecte & Gestion", "Mon Compte", "Déconnexion"])
 
         if menu == "Déconnexion":
             st.session_state.authenticated = False
             st.rerun()
+
+        elif menu == "Mon Compte":
+            st.header("⚙️ Paramètres du compte")
+            st.info(f"Email du compte : {u_email}")
+            
+            with st.form("edit_account"):
+                new_nom = st.text_input("Nom", value=st.session_state.user_info[1])
+                new_prenom = st.text_input("Prénom", value=st.session_state.user_info[2])
+                new_pw = st.text_input("Nouveau mot de passe (laisser vide pour ne pas changer)", type='password')
+                
+                if st.form_submit_button("Enregistrer les modifications"):
+                    if new_pw:
+                        hashed_new_pw = hash_pwd(new_pw)
+                        c.execute('UPDATE users SET nom=?, prenom=?, password=? WHERE email=?', (new_nom, new_prenom, hashed_new_pw, u_email))
+                    else:
+                        c.execute('UPDATE users SET nom=?, prenom=? WHERE email=?', (new_nom, new_prenom, u_email))
+                    
+                    conn.commit()
+                    # Mise à jour de la session
+                    st.session_state.user_info[1] = new_nom
+                    st.session_state.user_info[2] = new_prenom
+                    st.success("Informations mises à jour !")
+                    st.rerun()
 
         elif menu == "Collecte & Gestion":
             st.header("📋 Gestion des données patients")
@@ -122,7 +147,6 @@ def main():
                     selection = st.selectbox("Sélectionnez le patient à modifier", list(options.keys()))
                     selected_id = options[selection]
                     
-                    # Récupérer les données actuelles pour pré-remplir
                     c.execute('SELECT patient, poids, taille FROM collectes WHERE id=?', (selected_id,))
                     current_data = c.fetchone()
 
