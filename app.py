@@ -8,23 +8,35 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Nutri-Soutien Pro", page_icon="🥗", layout="wide")
 
-# CSS POUR FORCER LA VISIBILITÉ DU MENU SUR MOBILE
+# --- CSS POUR FORCER L'AFFICHAGE DU MENU SUR MOBILE ---
 st.markdown("""
     <style>
+    /* Masquer les éléments inutiles */
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;} 
     header {visibility: hidden;}
     
-    /* Style pour le bouton de la sidebar sur mobile */
-    .st-emotion-cache-15dx93d {
-        background-color: #2ecc71 !important;
+    /* FORCE L'AFFICHAGE DU BOUTON SIDEBAR SUR MOBILE */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: block !important;
+        background-color: #2ecc71 !important; /* Couleur verte */
         color: white !important;
-        border-radius: 50%;
+        border-radius: 8px !important;
+        padding: 5px !important;
+        left: 10px !important;
+        top: 10px !important;
+        z-index: 999999;
     }
-    
-    /* Rendre les onglets défilables sur mobile si nécessaire */
-    div.stTabs button {
-        font-size: 14px !important;
+
+    /* Optionnel : Rendre le texte plus lisible sur petit écran */
+    @media (max-width: 768px) {
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            font-size: 12px !important;
+            padding: 5px !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -89,7 +101,8 @@ def main():
 
     else:
         u_email = st.session_state.user_info[0]
-        # PARTIE NAVIGATION
+        
+        # --- SIDEBAR (NAVIGATION) ---
         st.sidebar.title(f"👤 {st.session_state.user_info[2]}")
         menu = st.sidebar.selectbox("Navigation", ["Collecte & Gestion", "Mon Compte", "Déconnexion"])
 
