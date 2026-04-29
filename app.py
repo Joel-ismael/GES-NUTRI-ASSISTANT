@@ -10,7 +10,7 @@ st.set_page_config(page_title="Nutri-Soutien Pro", page_icon="🥗", layout="wid
 st.markdown("""<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
 def init_db():
-    conn = sqlite3.connect('nutri_data_v2.db', check_same_thread=False)
+    conn = sqlite3.connect('nutri_data_v3.db', check_same_thread=False)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
                 email TEXT PRIMARY KEY, nom TEXT, prenom TEXT, 
@@ -32,49 +32,49 @@ if 'authenticated' not in st.session_state:
 
 def main():
     if not st.session_state.authenticated:
-        # --- LOGIQUE DE CONNEXION ---
-        st.title("🥗 Nutri-Soutien")
+        st.title("🥗 Accès Nutri-Soutien")
         choix = st.radio("Option :", ["Se connecter", "S'inscrire"], horizontal=True)
         
         if choix == "S'inscrire":
             with st.form("inscription"):
                 n, p, e, pw = st.text_input("Nom"), st.text_input("Prénom"), st.text_input("Email"), st.text_input("Mot de passe", type='password')
-                if st.form_submit_button("S'inscrire"):
+                if st.form_submit_button("Créer le compte"):
                     try:
                         c.execute('INSERT INTO users VALUES (?,?,?,?,?,?,?)', (e, n, p, "", hash_pwd(pw), "", ""))
                         conn.commit()
-                        st.success("Compte créé !")
-                    except: st.error("Erreur.")
+                        st.success("Compte créé avec succès !")
+                    except: st.error("Erreur : Email déjà utilisé.")
         else:
             with st.form("login"):
                 l_n, l_p, l_pw = st.text_input("Nom"), st.text_input("Prénom"), st.text_input("Mot de passe", type='password')
-                if st.form_submit_button("Connexion"):
+                if st.form_submit_button("Se connecter"):
                     c.execute('SELECT * FROM users WHERE nom=? AND prenom=? AND password=?', (l_n, l_p, hash_pwd(l_pw)))
                     user = c.fetchone()
                     if user:
                         st.session_state.authenticated, st.session_state.user_info = True, user
                         st.rerun()
+                    else: st.error("Identifiants incorrects.")
 
     else:
         u_email = st.session_state.user_info[0]
         st.sidebar.title(f"👤 {st.session_state.user_info[2]}")
-        menu = st.sidebar.selectbox("Navigation", ["Collecte & Gestion", "Déconnexion"])
+        menu = st.sidebar.selectbox("Navigation", ["Gestion des Patients", "Mon Compte", "Déconnexion"])
 
         if menu == "Déconnexion":
             st.session_state.authenticated = False
             st.rerun()
 
-        elif menu == "Collecte & Gestion":
-            st.header("📋 Gestion des données patients")
-            tab_saisie, tab_histo, tab_modif = st.tabs(["📥 Saisie", "📊 Archives & Graphique", "🛠️ Modifier/Supprimer"])
+        elif menu == "Gestion des Patients":
+            st.header("📋 Administration des données")
+            tab_saisie, tab_histo, tab_edit = st.tabs(["📥 Nouvelle Saisie", "📊 Archives", "🛠️ Modifier / Supprimer"])
             
-            # --- ONGLET 1 : SAISIE ---
+            # --- SAISIE ---
             with tab_saisie:
-                with st.form("form_saisie"):
+                with st.form("saisie_form"):
                     p_nom = st.text_input("Nom du Patient")
                     poids = st.number_input("Poids (kg)", 1.0, 250.0, 70.0)
                     taille = st.number_input("Taille (cm)", 50, 250, 170)
-                    if st.form_submit_button("Sauvegarder"):
+                    if st.form_submit_button("Enregistrer"):
                         imc = round(poids / ((taille/100)**2), 2)
                         statut = "Normal" if 18.5 <= imc < 25 else "Alerte"
                         c.execute('INSERT INTO collectes (user_email, date, patient, poids, taille, imc, statut) VALUES (?,?,?,?,?,?,?)',
@@ -82,50 +82,61 @@ def main():
                         conn.commit()
                         st.success(f"Données de {p_nom} enregistrées.")
 
-            # --- ONGLET 2 : ARCHIVES & GRAPHIQUE ---
+            # --- ARCHIVES ---
             with tab_histo:
-                c.execute('SELECT date, patient, imc, statut FROM collectes WHERE user_email=?', (u_email,))
+                c.execute('SELECT id, date, patient, poids, taille, imc, statut FROM collectes WHERE user_email=?', (u_email,))
                 rows = c.fetchall()
                 if rows:
-                    df = pd.DataFrame(rows, columns=["Date", "Patient", "IMC", "Statut"])
-                    col_t, col_g = st.columns(2)
-                    with col_t: st.dataframe(df, use_container_width=True)
-                    with col_g:
-                        fig = px.pie(df, names='Statut', hole=0.4, color='Statut',
-                                     color_discrete_map={'Normal':'#2ecc71', 'Alerte':'#e74c3c'})
-                        st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Aucune donnée.")
+                    df = pd.DataFrame(rows, columns=["ID", "Date", "Patient", "Poids", "Taille", "IMC", "Statut"])
+                    st.dataframe(df, use_container_width=True)
+                    fig = px.pie(df, names='Statut', hole=0.4, color='Statut', color_discrete_map={'Normal':'#2ecc71', 'Alerte':'#e74c3c'})
+                    st.plotly_chart(fig)
+                else: st.info("Aucune donnée disponible.")
 
-            # --- ONGLET 3 : MODIFIER / SUPPRIMER ---
-            with tab_modif:
-                st.subheader("Action sur une donnée spécifique")
-                c.execute('SELECT id, patient, date FROM collectes WHERE user_email=?', (u_email,))
+            # --- MODIFIER / SUPPRIMER TOUT ---
+            with tab_edit:
+                st.subheader("Édition complète d'une fiche")
+                c.execute('SELECT id, patient FROM collectes WHERE user_email=?', (u_email,))
                 items = c.fetchall()
+                
                 if items:
-                    options = {f"ID: {item[0]} | {item[1]} ({item[2]})": item[0] for item in items}
-                    selection = st.selectbox("Sélectionnez la donnée à gérer", list(options.keys()))
-                    selected_id = options[selection]
+                    options = {f"ID {item[0]} - {item[1]}": item[0] for item in items}
+                    selection = st.selectbox("Sélectionnez le patient à modifier", list(options.keys()))
+                    id_a_modifier = options[selection]
 
-                    col_edit, col_del = st.columns(2)
-                    
-                    with col_edit:
-                        st.write("🔧 **Modifier**")
-                        new_name = st.text_input("Nouveau nom du patient")
-                        if st.button("Mettre à jour le nom"):
-                            c.execute('UPDATE collectes SET patient=? WHERE id=?', (new_name, selected_id))
-                            conn.commit()
-                            st.success("Nom modifié !")
-                            st.rerun()
+                    # Récupération des données actuelles
+                    c.execute('SELECT patient, poids, taille FROM collectes WHERE id=?', (id_a_modifier,))
+                    curr = c.fetchone()
 
-                    with col_del:
+                    st.divider()
+                    col_m, col_d = st.columns([2, 1])
+
+                    with col_m:
+                        st.write("📝 **Modifier les informations**")
+                        with st.form("update_full_form"):
+                            edit_nom = st.text_input("Nom du Patient", value=curr[0])
+                            edit_poids = st.number_input("Poids (kg)", value=curr[1])
+                            edit_taille = st.number_input("Taille (cm)", value=curr[2])
+                            
+                            if st.form_submit_button("Appliquer les modifications"):
+                                new_imc = round(edit_poids / ((edit_taille/100)**2), 2)
+                                new_statut = "Normal" if 18.5 <= new_imc < 25 else "Alerte"
+                                c.execute('''UPDATE collectes 
+                                             SET patient=?, poids=?, taille=?, imc=?, statut=? 
+                                             WHERE id=?''', (edit_nom, edit_poids, edit_taille, new_imc, new_statut, id_a_modifier))
+                                conn.commit()
+                                st.success("Fiche patient mise à jour !")
+                                st.rerun()
+
+                    with col_d:
                         st.write("⚠️ **Zone de danger**")
-                        if st.button("🗑️ Supprimer définitivement"):
-                            c.execute('DELETE FROM collectes WHERE id=?', (selected_id,))
+                        if st.button("🗑️ Supprimer ce patient"):
+                            c.execute('DELETE FROM collectes WHERE id=?', (id_a_modifier,))
                             conn.commit()
-                            st.warning("Donnée supprimée.")
+                            st.warning("Donnée supprimée définitivement.")
                             st.rerun()
                 else:
-                    st.info("Rien à modifier.")
+                    st.info("Aucun patient enregistré.")
 
 if __name__ == '__main__':
     main()
